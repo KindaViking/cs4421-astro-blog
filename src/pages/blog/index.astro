@@ -18,7 +18,7 @@ const posts = (await getCollection('blog')).sort(
 		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
 		<style>
 			main {
-				width: 960px;
+				max-width: 900px;
 			}
 			ul {
 				display: flex;
@@ -44,34 +44,40 @@ const posts = (await getCollection('blog')).sort(
 				width: 100%;
 			}
 			ul li:first-child .title {
-				font-size: 2.369rem;
+				font-size: 1.8rem;
 			}
 			ul li img {
+				width: 100%;
 				margin-bottom: 0.5rem;
-				border-radius: 12px;
+				border-radius: 4px;
+				border: 1px solid var(--border);
+				display: block;
 			}
 			ul li a {
 				display: block;
 			}
 			.title {
 				margin: 0;
-				color: rgb(var(--black));
-				line-height: 1;
+				color: var(--fg);
+				font-family: var(--font);
+				line-height: 1.3;
 			}
 			.date {
-				margin: 0;
-				color: rgb(var(--gray));
+				margin: 0.25rem 0 0;
+				color: var(--fg-dim);
+				font-family: var(--font);
+				font-size: 0.85rem;
 			}
-			ul li a:hover h4,
+			ul li a:hover .title,
 			ul li a:hover .date {
-				color: rgb(var(--accent));
+				color: var(--accent);
 			}
-			ul a:hover img {
-				box-shadow: var(--box-shadow);
+			ul li a:hover img {
+				box-shadow: 0 0 12px rgba(255, 153, 0, 0.25);
 			}
 			@media (max-width: 720px) {
 				ul {
-					gap: 0.5em;
+					gap: 1.5rem;
 				}
 				ul li {
 					width: 100%;
@@ -81,7 +87,7 @@ const posts = (await getCollection('blog')).sort(
 					margin-bottom: 0;
 				}
 				ul li:first-child .title {
-					font-size: 1.563em;
+					font-size: 1.4rem;
 				}
 			}
 		</style>
