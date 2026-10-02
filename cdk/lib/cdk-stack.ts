@@ -13,16 +13,37 @@ export class StaticSiteStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
+    const rewriteFunction = new cloudfront.Function(this, 'UrlRewriteFunction', {
+      code: cloudfront.FunctionCode.fromInline(`
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          if (uri.endsWith('/')) {
+            request.uri += 'index.html';
+          } else if (!uri.includes('.')) {
+            request.uri += '/index.html';
+          }
+          return request;
+        }
+      `),
+    });
+
     const distribution = new cloudfront.Distribution(this, 'SiteDistribution', {
-      defaultBehavior: { origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket) },
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
+        functionAssociations: [{
+          function: rewriteFunction,
+          eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+        }],
+      },
       defaultRootObject: 'index.html',
     });
 
     new s3deploy.BucketDeployment(this, 'DeploySite', {
-      sources: [s3deploy.Source.asset('./dist')],
+      sources: [s3deploy.Source.asset('../dist')],
       destinationBucket: siteBucket,
       distribution,
-      distributionPaths: ['/*'], // Automatic CloudFront CDN cache invalidation!
+      distributionPaths: ['/*'],
     });
   }
 }
