@@ -16,6 +16,7 @@ jobs:
             cache: 'npm'
 
         - name: Install Project & CDK Dependencies
+          working-directory: cdk
           run: npm ci
 
         - name: Build Astro Static Site
