@@ -1,0 +1,92 @@
+---
+import { getEpicFrames } from '../utils/epic';
+import type { EpicFrame } from '../utils/epic';
+
+let frames: EpicFrame[] = [];
+
+try {
+  frames = await getEpicFrames();
+} catch (err) {
+  console.error('EPIC fetch failed:', err);
+}
+---
+
+{frames.length > 0 && (
+  <section class="epic">
+    <h2>Earth right now</h2>
+    <div class="frame">
+      {frames.map((f, i) => (
+        <img
+          src={f.src}
+          alt={`Earth from the DSCOVR satellite at ${f.time}`}
+          class:list={['earth', { active: i === 0 }]}
+          loading={i === 0 ? 'eager' : 'lazy'}
+          width="420"
+          height="420"
+          data-time={f.time}
+        />
+      ))}
+    </div>
+    <p class="caption">
+      <span>{frames[0].date}</span> ·
+      <span id="epic-time">{frames[0].time}</span>
+    </p>
+    <p class="credit">Image: NASA EPIC / DSCOVR</p>
+  </section>
+)}
+
+<style>
+  .epic {
+    text-align: center;
+    margin: 2rem 0;
+  }
+
+  .frame {
+    position: relative;
+    width: min(100%, 420px);
+    aspect-ratio: 1;
+    margin: 0 auto;
+  }
+
+  .earth {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .earth.active {
+    opacity: 1;
+  }
+
+  .caption {
+    margin: 0.75rem 0 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .credit {
+    margin: 0.25rem 0 0;
+    font-size: 0.8rem;
+    opacity: 0.6;
+  }
+</style>
+
+<script>
+  const images = document.querySelectorAll<HTMLImageElement>('.earth');
+  const timeEl = document.getElementById('epic-time');
+
+  if (images.length > 1) {
+    let current = 0;
+
+    setInterval(() => {
+      images[current].classList.remove('active');
+      current = (current + 1) % images.length;
+      images[current].classList.add('active');
+
+      if (timeEl) timeEl.textContent = images[current].dataset.time ?? '';
+    }, 1200);
+  }
+</script>
