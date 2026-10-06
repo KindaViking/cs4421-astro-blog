@@ -4,6 +4,7 @@ import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
 import { getCollection } from 'astro:content';
+import EpicEarth from '../components/EpicEarth.astro';
 
 const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
@@ -18,14 +19,16 @@ const posts = (await getCollection('blog')).sort(
 	<body>
 		<Header />
 		<main>
-			<h1>🧑‍🚀 Hello, People!</h1>
+			<h1>Hello, Major Tom!</h1>
 			<p>
-				Welcome to my devlog — I'm a software engineering student documenting my
-				hands-on practice with version control and DevOps workflows. This blog
-				itself is the practice project: built with Astro, tracked in Git, and
-				developed through feature branches and pull requests as I go.
+            Welcome to my space devlog. I'm a software engineering student writing
+        about the rovers and technology that explore other worlds, from
+        Sojourner's first drive on Mars to the software that keeps modern
+        missions running. This blog is also a practice project: built with
+        Astro, tracked in Git, and developed through feature branches and pull
+        requests as I go.
 			</p>
-
+            <EpicEarth />
 			<hr class="divider" />
 
 			<h2>Latest posts</h2>
