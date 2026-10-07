@@ -5,6 +5,8 @@ import Header from '../components/Header.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
 import { getCollection } from 'astro:content';
 import EpicEarth from '../components/EpicEarth.astro';
+import NearEarthObjects from '../components/NearEarthObjects.astro';
+import SpaceWeather from '../components/SpaceWeather.astro';
 
 const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
@@ -29,6 +31,11 @@ const posts = (await getCollection('blog')).sort(
         requests as I go.
 			</p>
             <EpicEarth />
+            <div class="space-data">
+                 <SpaceWeather />
+                 <NearEarthObjects />
+            </div>
+
 			<hr class="divider" />
 
 			<h2>Latest posts</h2>
@@ -53,3 +60,11 @@ const posts = (await getCollection('blog')).sort(
 		<Footer />
 	</body>
 </html>
+<style>
+  .space-data {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    align-items: start;
+  }
+</style>
