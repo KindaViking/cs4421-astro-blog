@@ -1,0 +1,65 @@
+---
+import { getAsteroids } from '../utils/neows';
+import type { Asteroid } from '../utils/neows';
+
+let asteroids: Asteroid[] = [];
+
+try {
+  asteroids = await getAsteroids();
+} catch (err) {
+  console.error('NeoWs fetch failed:', err);
+}
+---
+
+{asteroids.length > 0 && (
+  <section class="neo">
+    <h2>Asteroids passing Earth today</h2>
+    <ul>
+      {asteroids.map((a) => (
+        <li>
+          <strong>{a.name}</strong>
+          {a.hazardous && <span class="flag">potentially hazardous</span>}
+          <br />
+          <span class="detail">
+            up to {Math.round(a.diameterM)} m wide ·
+            {a.missLunar.toFixed(1)}× Moon distance
+            ({Math.round(a.missKm).toLocaleString('en-GB')} km) ·
+            {a.speedKps.toFixed(1)} km/s
+          </span>
+        </li>
+      ))}
+    </ul>
+    <p class="credit">Data: NASA NeoWs. Closest five approaches shown.</p>
+  </section>
+)}
+
+<style>
+  .neo {
+    margin: 2rem 0;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  li {
+    margin-bottom: 0.75rem;
+  }
+
+  .flag {
+    margin-left: 0.5rem;
+    font-size: 0.8rem;
+    opacity: 0.8;
+  }
+
+  .detail {
+    font-size: 0.9rem;
+    opacity: 0.8;
+  }
+
+  .credit {
+    font-size: 0.8rem;
+    opacity: 0.6;
+  }
+</style>

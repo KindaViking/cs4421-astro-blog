@@ -1,0 +1,49 @@
+---
+import { getKp } from '../utils/spaceWeather';
+import type { KpReading } from '../utils/spaceWeather';
+
+let reading: KpReading | null = null;
+
+try {
+  reading = await getKp();
+} catch (err) {
+  console.error('Space weather fetch failed:', err);
+}
+
+function describe(kp: number): string {
+  if (kp >= 5) return `Geomagnetic storm (G${Math.floor(kp) - 4})`;
+  if (kp >= 4) return 'Active';
+  return 'Quiet';
+}
+---
+
+{reading && (
+  <section class="weather">
+    <h2>Space weather</h2>
+    <p class="kp">Kp {reading.kp.toFixed(1)} · {describe(reading.kp)}</p>
+    <p class="detail">Latest reading: {reading.time} UTC</p>
+    <p class="credit">Data: NOAA Space Weather Prediction Center</p>
+  </section>
+)}
+
+<style>
+  .weather {
+    margin: 2rem 0;
+  }
+
+  .kp {
+    font-size: 1.4rem;
+    margin: 0;
+  }
+
+  .detail {
+    margin: 0.25rem 0 0;
+    font-size: 0.9rem;
+    opacity: 0.8;
+  }
+
+  .credit {
+    font-size: 0.8rem;
+    opacity: 0.6;
+  }
+</style>
