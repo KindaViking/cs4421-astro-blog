@@ -1,6 +1,8 @@
 services:
   astro:
-    build: .
+    build:
+     context: .
+     dockerfile: Dockerfile.dev
     ports:
       - "4321:4321"
     volumes:
