@@ -1,8 +1,7 @@
 name: Deploy Static Site via AWS CDK
 
 on:
-  push:
-    branches: [main]
+ workflow_dispatch:
 
 jobs:
   deploy:
