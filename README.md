@@ -22,15 +22,15 @@ A space-themed blog built with [Astro](https://astro.build): a home page, an abo
 | Code quality | ESLint |
 | Containers | Docker (Node 22 on Alpine), Docker Compose, Amazon ECR |
 | CI/CD | GitHub Actions, Dependabot |
-| Infrastructure | AWS CDK, S3, CloudFront |
+| Infrastructure | AWS CDK, ECS Fargate, Application Load Balancer |
 
 ## Project structure
 
 ```
 .
 ├── .github/          Workflows (CI, deploy, Playwright) and Dependabot config
-├── cdk/              AWS CDK stack (S3 bucket and CloudFront distribution)
-├── docs/             Project documentation
+├── cdk/              AWS CDK stack (ECS Fargate service behind a load balancer)
+├── docs/             Project documentation and architecture decision records
 ├── e2e/              Playwright end-to-end tests
 ├── public/           Static assets
 ├── src/              Pages, components, content and the API routes
@@ -124,25 +124,29 @@ Workflows live in `.github/workflows`:
 
 | Workflow | Purpose |
 |---|---|
-| `ci.yml` | Runs `build` and `docker` jobs on every pull request and push to `main`, then a `deploy` job on `main` |
+| `ci.yml` | Runs `build`, `docker` and `infra` jobs on every pull request and push to `main`, then a `deploy` job on `main` |
 | `playwright.yml` | End-to-end tests with Playwright |
-| `deploy-static.yml` | Manual-only deploy, started from the Actions tab with **Run workflow** |
 | Dependabot | Automated dependency update pull requests |
 
 How a change reaches production:
 
 ```
-Pull request:   build ✓   docker ✓   deploy (skipped)
-Merge to main:  build ✓   docker ✓   →   deploy
+Pull request:   build ✓   docker ✓   infra ✓   deploy (skipped)
+Merge to main:  build ✓   docker ✓   infra ✓   →   deploy
 ```
 
 - **build**: `npm ci`, lint, unit tests, then `npm run build`
 - **docker**: builds the production image to prove the Dockerfile still works
-- **deploy**: waits for `build` and `docker`, runs only on pushes to `main`, then runs `cdk deploy`. The CDK stack uploads the site to S3 behind CloudFront and invalidates the cache (`/*`) after each upload
+- **infra**: type-checks the CDK app and runs its Jest tests
+- **deploy**: waits for the other jobs and runs only on pushes to `main`. It builds the production image, tags it with the commit SHA, pushes it to ECR, then runs `cdk deploy -c imageTag=<sha>`. ECS starts the new task and waits for it to pass the `/api/health` check before stopping the old one. If the new task fails its health checks, the circuit breaker rolls back to the previous version
+
+The app URL is printed as the `ServiceURL` stack output at the end of the deploy step. See [ADR-002](docs/adr/ADR-002-ecs-fargate-runtime.md) for why the app runs on ECS Fargate.
 
 Workflows use least-privilege permissions (`contents: read`). AWS credentials are stored as repository secrets, never in the code.
 
 ## Publishing the image to Amazon ECR
+
+The `deploy` job pushes an image tagged with the commit SHA on every merge to `main`. To publish a tagged release by hand:
 
 Replace `<account_id>` with your AWS account ID:
 
