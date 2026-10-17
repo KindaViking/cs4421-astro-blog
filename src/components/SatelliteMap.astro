@@ -1,0 +1,234 @@
+---
+import { GROUPS } from '../utils/celestrak';
+---
+
+<section class="tracker" aria-labelledby="tracker-heading">
+  <h2 id="tracker-heading">Live satellite tracker</h2>
+
+  <div class="controls">
+    <div class="control">
+      <label for="group-select">Group</label>
+      <select id="group-select">
+        {Object.entries(GROUPS).map(([value, label]) => <option value={value}>{label}</option>)}
+      </select>
+    </div>
+    <div class="control">
+      <label for="sat-select">Satellite</label>
+      <select id="sat-select" disabled>
+        <option>Loading…</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="map" class="map" role="region" aria-label="Map of satellite positions"></div>
+
+  <p id="tracker-status" class="status" role="status">Loading satellites…</p>
+
+  <dl id="sat-info" class="info" hidden>
+    <div><dt>Name</dt><dd data-field="name"></dd></div>
+    <div><dt>NORAD ID</dt><dd data-field="norad"></dd></div>
+    <div><dt>Latitude</dt><dd data-field="lat"></dd></div>
+    <div><dt>Longitude</dt><dd data-field="lon"></dd></div>
+    <div><dt>Altitude</dt><dd data-field="alt"></dd></div>
+    <div><dt>Speed</dt><dd data-field="speed"></dd></div>
+    <div><dt>Orbit period</dt><dd data-field="period"></dd></div>
+  </dl>
+</section>
+
+<script>
+  import L from 'leaflet';
+  import 'leaflet/dist/leaflet.css';
+  import type { OMMJsonObject } from 'satellite.js';
+  import { groundTrack, periodMinutes, positionAt } from '../utils/orbit';
+
+  const ISS_ID = 25544;
+
+  const groupSelect = document.querySelector<HTMLSelectElement>('#group-select')!;
+  const satSelect = document.querySelector<HTMLSelectElement>('#sat-select')!;
+  const status = document.querySelector<HTMLParagraphElement>('#tracker-status')!;
+  const info = document.querySelector<HTMLDListElement>('#sat-info')!;
+  const field = (name: string) => info.querySelector<HTMLElement>(`[data-field="${name}"]`)!;
+
+  const map = L.map('map', { center: [20, 0], zoom: 2, minZoom: 2, worldCopyJump: true });
+  // Standard OSM tiles need no API key; the .map-tiles filter darkens them.
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    className: 'map-tiles',
+    maxZoom: 8,
+  }).addTo(map);
+
+  // Leaflet only measures the container when the map is created. Layout can
+  // shift after that (web fonts loading, a scrollbar appearing), which leaves
+  // markers undrawn until the map is moved, so re-measure whenever it resizes.
+  new ResizeObserver(() => map.invalidateSize()).observe(map.getContainer());
+
+  const markers = L.layerGroup().addTo(map);
+  const track = L.layerGroup().addTo(map);
+
+  let satellites: OMMJsonObject[] = [];
+  let markerById = new Map<number, L.CircleMarker>();
+  let selectedId: number | null = null;
+
+  const idOf = (sat: OMMJsonObject) => Number(sat.NORAD_CAT_ID);
+
+  function style(selected: boolean): L.CircleMarkerOptions {
+    return selected
+      ? { radius: 7, color: '#ff9900', fillColor: '#ff9900', fillOpacity: 1, weight: 2 }
+      : { radius: 4, color: '#33ff33', fillColor: '#33ff33', fillOpacity: 0.8, weight: 1 };
+  }
+
+  function select(id: number) {
+    if (selectedId !== null) markerById.get(selectedId)?.setStyle(style(false));
+    selectedId = id;
+    satSelect.value = String(id);
+
+    const marker = markerById.get(id);
+    marker?.setStyle(style(true)).bringToFront();
+
+    const sat = satellites.find((s) => idOf(s) === id);
+    track.clearLayers();
+    if (sat) {
+      L.polyline(groundTrack(sat, new Date()), { color: '#ff9900', weight: 1.5, dashArray: '4 4' }).addTo(track);
+      field('name').textContent = sat.OBJECT_NAME;
+      field('norad').textContent = String(id);
+      field('period').textContent = `${periodMinutes(sat).toFixed(1)} min`;
+    }
+    info.hidden = !sat;
+    update();
+  }
+
+  // Recompute every satellite's position. Called once a second.
+  function update() {
+    const now = new Date();
+    for (const sat of satellites) {
+      const pos = positionAt(sat, now);
+      const marker = markerById.get(idOf(sat));
+      if (!pos || !marker) continue;
+
+      marker.setLatLng([pos.lat, pos.lon]);
+      if (idOf(sat) === selectedId) {
+        field('lat').textContent = `${pos.lat.toFixed(2)}°`;
+        field('lon').textContent = `${pos.lon.toFixed(2)}°`;
+        field('alt').textContent = `${Math.round(pos.altKm).toLocaleString('en-GB')} km`;
+        field('speed').textContent = `${pos.speedKps.toFixed(2)} km/s`;
+      }
+    }
+  }
+
+  async function loadGroup(group: string) {
+    status.textContent = 'Loading satellites…';
+    satSelect.disabled = true;
+
+    try {
+      const res = await fetch(`/api/satellites/${group}`);
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+      const data: { satellites: OMMJsonObject[] } = await res.json();
+
+      const now = new Date();
+      // Drop satellites SGP4 can't propagate (decayed or stale elements).
+      satellites = data.satellites
+        .filter((sat) => positionAt(sat, now))
+        .sort((a, b) => a.OBJECT_NAME.localeCompare(b.OBJECT_NAME));
+    } catch (err) {
+      console.error('Failed to load satellites:', err);
+      satellites = [];
+      markers.clearLayers();
+      track.clearLayers();
+      info.hidden = true;
+      satSelect.replaceChildren(new Option('Unavailable'));
+      status.textContent = 'Satellite data is unavailable right now. Try again in a few minutes.';
+      return;
+    }
+
+    markers.clearLayers();
+    markerById = new Map();
+    for (const sat of satellites) {
+      const id = idOf(sat);
+      const marker = L.circleMarker([0, 0], { ...style(false), className: 'sat-marker' })
+        .bindTooltip(sat.OBJECT_NAME)
+        .on('click', () => select(id))
+        .addTo(markers);
+      markerById.set(id, marker);
+    }
+
+    satSelect.replaceChildren(...satellites.map((s) => new Option(s.OBJECT_NAME, String(idOf(s)))));
+    satSelect.disabled = false;
+    status.textContent = `Tracking ${satellites.length} satellites. Positions update every second.`;
+
+    selectedId = null;
+    const first = markerById.has(ISS_ID) ? ISS_ID : satellites[0] && idOf(satellites[0]);
+    if (first) select(first);
+  }
+
+  groupSelect.addEventListener('change', () => loadGroup(groupSelect.value));
+  satSelect.addEventListener('change', () => select(Number(satSelect.value)));
+
+  loadGroup(groupSelect.value);
+  setInterval(update, 1000);
+</script>
+
+<style>
+  .tracker {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 0;
+  }
+  .tracker h2 {
+    margin-top: 0;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+    margin-bottom: 1rem;
+  }
+  .control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .control label {
+    color: var(--fg-dim);
+  }
+  .controls select {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    font: inherit;
+    padding: 0.25rem 0.5rem;
+    max-width: 18rem;
+  }
+  .map {
+    height: min(60vh, 520px);
+    border: 1px solid var(--border);
+    background: #000;
+  }
+  /* Leaflet creates the tiles at runtime, so the style needs :global */
+  .map :global(.map-tiles) {
+    filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(0.9) saturate(0.4);
+  }
+  .status {
+    color: var(--fg-dim);
+    font-size: 0.85rem;
+  }
+  .info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem 1.5rem;
+    margin: 1rem 0 0;
+    padding: 1rem;
+    border: 1px solid var(--border);
+  }
+  .info[hidden] {
+    display: none;
+  }
+  .info dt {
+    color: var(--fg-dim);
+    font-size: 0.8rem;
+  }
+  .info dd {
+    margin: 0;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

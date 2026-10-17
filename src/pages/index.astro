@@ -7,6 +7,7 @@ import { getCollection } from 'astro:content';
 import EpicEarth from '../components/EpicEarth.astro';
 import NearEarthObjects from '../components/NearEarthObjects.astro';
 import SpaceWeather from '../components/SpaceWeather.astro';
+import SatelliteMap from '../components/SatelliteMap.astro';
 
 const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
@@ -20,6 +21,7 @@ const posts = (await getCollection('blog')).sort(
 	</head>
 	<body>
 		<Header />
+		<SatelliteMap />
 		<main>
 			<h1>Hello, Major Tom!</h1>
 			<p>
