@@ -40,4 +40,10 @@ export default defineConfig({
   adapter: node({
     mode: 'standalone',
   }),
+
+  vite: {
+    // satellite.js ships an optional WebAssembly worker that uses top-level
+    // await, which Vite's default 'iife' worker format can't bundle.
+    worker: { format: 'es' },
+  },
 });

@@ -1,0 +1,63 @@
+{
+  "group": "stations",
+  "fetchedAt": "2026-10-17T12:00:00.000Z",
+  "satellites": [
+    {
+      "OBJECT_NAME": "ISS (ZARYA)",
+      "OBJECT_ID": "1998-067A",
+      "EPOCH": "2026-10-17T04:14:38.489568",
+      "MEAN_MOTION": 15.48906925,
+      "ECCENTRICITY": 0.00067762,
+      "INCLINATION": 51.6327,
+      "RA_OF_ASC_NODE": 56.4129,
+      "ARG_OF_PERICENTER": 273.6806,
+      "MEAN_ANOMALY": 86.3408,
+      "EPHEMERIS_TYPE": 0,
+      "CLASSIFICATION_TYPE": "U",
+      "NORAD_CAT_ID": 25544,
+      "ELEMENT_SET_NO": 999,
+      "REV_AT_EPOCH": 59066,
+      "BSTAR": 0.00016757209,
+      "MEAN_MOTION_DOT": 8.767e-5,
+      "MEAN_MOTION_DDOT": 0
+    },
+    {
+      "OBJECT_NAME": "CSS (TIANHE)",
+      "OBJECT_ID": "2021-035A",
+      "EPOCH": "2026-10-17T06:59:59.920800",
+      "MEAN_MOTION": 15.60848183,
+      "ECCENTRICITY": 0.00011299,
+      "INCLINATION": 41.4693,
+      "RA_OF_ASC_NODE": 300.3392,
+      "ARG_OF_PERICENTER": 164.2198,
+      "MEAN_ANOMALY": 195.8677,
+      "EPHEMERIS_TYPE": 0,
+      "CLASSIFICATION_TYPE": "U",
+      "NORAD_CAT_ID": 48274,
+      "ELEMENT_SET_NO": 999,
+      "REV_AT_EPOCH": 31223,
+      "BSTAR": 0.00027565227,
+      "MEAN_MOTION_DOT": 0.00023417,
+      "MEAN_MOTION_DDOT": 0
+    },
+    {
+      "OBJECT_NAME": "DECAYED TEST OBJECT",
+      "OBJECT_ID": "1999-999A",
+      "EPOCH": "2000-01-01T00:00:00",
+      "MEAN_MOTION": 16.5,
+      "ECCENTRICITY": 0.00067762,
+      "INCLINATION": 51.6327,
+      "RA_OF_ASC_NODE": 56.4129,
+      "ARG_OF_PERICENTER": 273.6806,
+      "MEAN_ANOMALY": 86.3408,
+      "EPHEMERIS_TYPE": 0,
+      "CLASSIFICATION_TYPE": "U",
+      "NORAD_CAT_ID": 99999,
+      "ELEMENT_SET_NO": 999,
+      "REV_AT_EPOCH": 1,
+      "BSTAR": 0.00016757209,
+      "MEAN_MOTION_DOT": 8.767e-5,
+      "MEAN_MOTION_DDOT": 0
+    }
+  ]
+}

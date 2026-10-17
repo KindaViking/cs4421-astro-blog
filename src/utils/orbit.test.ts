@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { OMMJsonObject } from 'satellite.js';
-import { periodMinutes, positionAt } from './orbit';
+import { groundTrack, periodMinutes, positionAt } from './orbit';
 
 // Real CelesTrak elements for the ISS, so results are deterministic.
 const ISS: OMMJsonObject = {
@@ -64,5 +64,39 @@ describe('positionAt', () => {
 describe('periodMinutes', () => {
   it('converts mean motion to an orbital period', () => {
     expect(periodMinutes(ISS)).toBeCloseTo(92.97, 1);
+  });
+});
+
+describe('groundTrack', () => {
+  it('covers one full orbit', () => {
+    const points = groundTrack(ISS, EPOCH, 60).flat();
+
+    // ~93 minute period at one point per minute, plus the end point
+    expect(points.length).toBeGreaterThanOrEqual(93);
+    expect(points.length).toBeLessThanOrEqual(95);
+  });
+
+  it('starts at the current position', () => {
+    const [first] = groundTrack(ISS, EPOCH)[0];
+    const pos = positionAt(ISS, EPOCH)!;
+
+    expect(first).toEqual([pos.lat, pos.lon]);
+  });
+
+  it('splits the path where it crosses the 180° meridian', () => {
+    const segments = groundTrack(ISS, EPOCH, 30);
+
+    expect(segments.length).toBeGreaterThan(1);
+    for (const segment of segments) {
+      for (let i = 1; i < segment.length; i++) {
+        expect(Math.abs(segment[i][1] - segment[i - 1][1])).toBeLessThan(180);
+      }
+    }
+  });
+
+  it('returns no segments when the elements cannot be propagated', () => {
+    const decayed = { ...ISS, EPOCH: '2000-01-01T00:00:00', MEAN_MOTION: 16.5 };
+
+    expect(groundTrack(decayed, new Date('2026-10-17T00:00:00Z'))).toEqual([]);
   });
 });
