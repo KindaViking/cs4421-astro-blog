@@ -1,17 +1,43 @@
-// import * as cdk from 'aws-cdk-lib/core';
-// import { Template } from 'aws-cdk-lib/assertions';
-// import * as Cdk from '../lib/cdk-stack';
+import * as cdk from 'aws-cdk-lib/core';
+import { Match, Template } from 'aws-cdk-lib/assertions';
+import { AppStack } from '../lib/app-stack';
 
-// example test. To run these tests, uncomment this file along with the
-// example resource in lib/cdk-stack.ts
-test('SQS Queue Created', () => {
-//   const app = new cdk.App();
-//     // WHEN
-//   const stack = new Cdk.CdkStack(app, 'MyTestStack');
-//     // THEN
-//   const template = Template.fromStack(stack);
+function synth(imageTag = 'abc123') {
+  const app = new cdk.App();
+  const stack = new AppStack(app, 'TestStack', {
+    env: { account: '123456789012', region: 'us-east-1' },
+    repositoryName: 'astro-blog',
+    imageTag,
+  });
+  return Template.fromStack(stack);
+}
 
-//   template.hasResourceProperties('AWS::SQS::Queue', {
-//     VisibilityTimeout: 300
-//   });
+test('runs the requested image tag from ECR on port 4321', () => {
+  const taskDefs = synth('abc123').findResources('AWS::ECS::TaskDefinition');
+  const [container] = Object.values(taskDefs)[0].Properties.ContainerDefinitions;
+
+  expect(JSON.stringify(container.Image)).toContain('/astro-blog:abc123');
+  expect(container.PortMappings).toEqual([
+    expect.objectContaining({ ContainerPort: 4321 }),
+  ]);
+});
+
+test('load balancer health check uses /api/health', () => {
+  synth().hasResourceProperties('AWS::ElasticLoadBalancingV2::TargetGroup', {
+    HealthCheckPath: '/api/health',
+    Port: 80,
+  });
+});
+
+test('failed deployments roll back automatically', () => {
+  synth().hasResourceProperties('AWS::ECS::Service', {
+    LaunchType: 'FARGATE',
+    DeploymentConfiguration: Match.objectLike({
+      DeploymentCircuitBreaker: { Enable: true, Rollback: true },
+    }),
+  });
+});
+
+test('creates no NAT gateways', () => {
+  synth().resourceCountIs('AWS::EC2::NatGateway', 0);
 });
