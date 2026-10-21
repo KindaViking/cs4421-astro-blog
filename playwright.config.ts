@@ -75,7 +75,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run build && node ./dist/server/entry.mjs',
     url: 'http://localhost:4321/api/health',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI || !!process.env.REUSE_SERVER,
     timeout: 180_000,
   },
 });
