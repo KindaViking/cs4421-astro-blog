@@ -41,3 +41,17 @@ test('failed deployments roll back automatically', () => {
 test('creates no NAT gateways', () => {
   synth().resourceCountIs('AWS::EC2::NatGateway', 0);
 });
+
+test('alarms on 5xx log lines and unhealthy tasks', () => {
+  const template = synth();
+  template.hasResourceProperties('AWS::Logs::MetricFilter', {
+    FilterPattern: '{ $.statusCode >= 500 }',
+  });
+  template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+    AlarmName: 'astro-blog-5xx-errors',
+  });
+  template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+    AlarmName: 'astro-blog-unhealthy-tasks',
+    MetricName: 'UnHealthyHostCount',
+  });
+});
