@@ -1,0 +1,28 @@
+name: Stress test
+
+# Only runs when started by hand from the Actions tab.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Base URL of the site to stress test
+        required: true
+        default: http://AstroA-Servi-hALX5bpxRAFJ-214040983.us-east-1.elb.amazonaws.com
+
+permissions:
+  contents: read
+
+jobs:
+  stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run k6 stress test
+        env:
+          BASE_URL: ${{ inputs.url }}
+        run: |
+          docker run --rm -v "$PWD/load:/load" \
+            -e BASE_URL -e PROFILE=stress \
+            grafana/k6:2.3.0 run /load/k6.js

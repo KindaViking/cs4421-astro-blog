@@ -58,6 +58,11 @@ jobs:
           curl -fs -o /dev/null http://localhost:4321/blog
           docker logs app 2>&1 | grep statusCode | tail -1 | jq -e '.statusCode == 200'
 
+      - name: Load test the container
+        run: |
+          docker run --rm --network host -v "$PWD/load:/load" \
+            grafana/k6:2.3.0 run /load/k6.js
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
