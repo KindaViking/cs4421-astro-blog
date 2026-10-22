@@ -1,5 +1,6 @@
 ---
 import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro'
 
 interface SocialLink {
 	platform: string;
@@ -8,7 +9,7 @@ interface SocialLink {
 
 interface Props {
 	name: string;
-	//avatar: ImageMetadata;
+	avatar: ImageMetadata;
 	bio: string;
 	socialLinks?: SocialLink[];
 }
