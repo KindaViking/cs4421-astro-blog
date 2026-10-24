@@ -8,7 +8,7 @@ import node from '@astrojs/node';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://example.com',
+  site: 'http://AstroA-Servi-hALX5bpxRAFJ-214040983.us-east-1.elb.amazonaws.com',
   output: 'server',
   integrations: [mdx(), sitemap()],
 
