@@ -1,0 +1,38 @@
+# ADR-003: Deploy Static and SSR Versions Side by Side
+
+## Status
+
+Accepted (2026-10-26)
+
+## Context
+
+ADR-001 moved the site from a static build on S3 and CloudFront to server-side rendering in a container, and ADR-002 runs that container on ECS Fargate. The static deployment was removed at the time.
+
+Both versions are now wanted in production at once, so the two approaches can be run and compared side by side. Each needs its own deploy, and both must come from the same codebase so they don't drift apart.
+
+A static build has no server, so some parts of the site cannot work in it:
+
+- the API routes (`/api/health`, `/api/satellites/[group]`)
+- the satellite tracker, which fetches from `/api/satellites`
+- the EPIC, NeoWs and space weather widgets, which fetch live data on the server
+
+### Options considered
+
+1. **Two separate sites:** keep SSR on ECS, and deploy a static build to S3 and CloudFront with its own URL.
+2. **One site behind CloudFront:** CloudFront in front of both, serving static pages from S3 and sending dynamic routes to the load balancer. One URL, but much more infrastructure, and riskier to introduce shortly before the live defence.
+
+For the static site's server-only features:
+
+- **Hide them:** the static site shows the blog, posts, about page and RSS feed only.
+- **Build-time snapshot:** fetch the data once at build time. The data would be stale until the next deploy, and could mislead.
+- **Call the ECS API from the static site:** needs CORS, and ties the static site to the SSR one.
+
+## Decision
+
+Option 1, with the server-only features hidden on the static site.
+
+- One codebase, two builds. `npm run build` builds the SSR site as before. `BUILD_TARGET=static npm run build` switches Astro to static output with no Node adapter.
+- Pages check `import.meta.env.STATIC_BUILD` to leave out the tracker and live widgets. The satellite route returns no paths in the static build, so it is left out.
+- The original `StaticSiteStack` (S3 bucket, CloudFront with origin access control, URL rewrite function, upload with cache invalidation) is restored in `cdk/lib/static-site-stack.ts`. It is only added to the CDK app with `-c staticSite=true`, because it uploads the static build, which only exists in the static deploy.
+- Each site has its own deploy workflow: `deploy-container.yml` (unchanged from the old `deploy` job) and `deploy-static.yml` (the original static workflow, now also callable from CI). `ci.yml` calls both after every check passes on `main`.
+- CI builds the static site on every pull request, and the CDK tests cover the static stack, so a broken static build or stack fails before deploy.

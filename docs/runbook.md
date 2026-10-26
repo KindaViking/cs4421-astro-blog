@@ -99,3 +99,24 @@ A continuous run of `200`s means no downtime. The old task keeps serving until t
 | Traffic spike | Response times rise | Raise `desiredCount` in `cdk/lib/app-stack.ts` and deploy |
 | CI or deploy fails | Red job in Actions | The live site is unaffected. Fix forward through a PR |
 | AWS keys revoked or expired | Deploy fails at "Configure AWS Credentials" | Create new keys in IAM, update the repository secrets, rerun |
+
+
+## Static site (S3 and CloudFront)
+
+The static site is a separate deployment with no server, so there are no health checks, alarms or request logs for it.
+
+**Check it:** open the `SiteURL` output of `StaticSiteStack`:
+
+```bash
+aws cloudformation describe-stacks --stack-name StaticSiteStack --region us-east-1 \
+  --query "Stacks[0].Outputs" --output table
+```
+
+**If a bad version was deployed:** there is no image tag to roll back to, because each deploy replaces the files in the bucket. Either:
+
+- revert the bad commit through a pull request; the merge redeploys the static site, or
+- rerun the `deploy-static` workflow by hand for an earlier commit: Actions → Deploy Static Site via AWS CDK → Run workflow → choose the branch or tag
+
+Each deploy clears the CloudFront cache (`/*`), so the change shows straight away.
+
+**If only the static deploy fails:** the server-rendered site is unaffected, and the static site keeps serving its previous version.
