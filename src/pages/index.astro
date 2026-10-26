@@ -9,6 +9,9 @@ import NearEarthObjects from '../components/NearEarthObjects.astro';
 import SpaceWeather from '../components/SpaceWeather.astro';
 import SatelliteMap from '../components/SatelliteMap.astro';
 
+// The static site has no server, so it leaves out the tracker and live data widgets.
+const isStatic = import.meta.env.STATIC_BUILD;
+
 const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
@@ -21,7 +24,7 @@ const posts = (await getCollection('blog')).sort(
 	</head>
 	<body>
 		<Header />
-		<SatelliteMap />
+		{!isStatic && <SatelliteMap />}
 		<main>
 			<h1>Hello, Major Tom!</h1>
 			<p>
@@ -32,11 +35,15 @@ const posts = (await getCollection('blog')).sort(
         Astro, tracked in Git, and developed through feature branches and pull
         requests as I go.
 			</p>
-            <EpicEarth />
-            <div class="space-data">
-                 <SpaceWeather />
-                 <NearEarthObjects />
-            </div>
+            {!isStatic && (
+                <>
+                    <EpicEarth />
+                    <div class="space-data">
+                        <SpaceWeather />
+                        <NearEarthObjects />
+                    </div>
+                </>
+            )}
 
 			<hr class="divider" />
 

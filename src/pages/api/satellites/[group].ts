@@ -7,6 +7,9 @@ const json = (body: unknown, status: number, headers: Record<string, string> = {
     headers: { 'Content-Type': 'application/json', ...headers },
   });
 
+// The static site has no server, so this route is left out of its build.
+export const getStaticPaths = import.meta.env.STATIC_BUILD ? () => [] : undefined;
+
 export const GET: APIRoute = async ({ params }) => {
   const group = params.group ?? '';
 
