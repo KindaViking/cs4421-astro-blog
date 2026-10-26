@@ -5,6 +5,7 @@ import sitemap from '@astrojs/sitemap';
 import { defineConfig, fontProviders } from 'astro/config';
 
 import node from '@astrojs/node';
+import process from 'node:process';
 
 // BUILD_TARGET=static builds a plain static site for S3, with no Node server.
 const isStatic = process.env.BUILD_TARGET === 'static';
