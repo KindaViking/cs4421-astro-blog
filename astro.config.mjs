@@ -5,11 +5,15 @@ import sitemap from '@astrojs/sitemap';
 import { defineConfig, fontProviders } from 'astro/config';
 
 import node from '@astrojs/node';
+import process from 'node:process';
+
+// BUILD_TARGET=static builds a plain static site for S3, with no Node server.
+const isStatic = process.env.BUILD_TARGET === 'static';
 
 // https://astro.build/config
 export default defineConfig({
   site: 'http://AstroA-Servi-hALX5bpxRAFJ-214040983.us-east-1.elb.amazonaws.com',
-  output: 'server',
+  output: isStatic ? 'static' : 'server',
   integrations: [mdx(), sitemap()],
 
   fonts: [
@@ -37,7 +41,7 @@ export default defineConfig({
       },
   ],
 
-  adapter: node({
+  adapter: isStatic ? undefined : node({
     mode: 'standalone',
   }),
 
@@ -45,5 +49,7 @@ export default defineConfig({
     // satellite.js ships an optional WebAssembly worker that uses top-level
     // await, which Vite's default 'iife' worker format can't bundle.
     worker: { format: 'es' },
+    // Lets pages check import.meta.env.STATIC_BUILD to leave out server-only parts.
+    define: { 'import.meta.env.STATIC_BUILD': JSON.stringify(isStatic) },
   },
 });
