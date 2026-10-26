@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/KindaViking/cs4421-astro-blog/actions/workflows/ci.yml/badge.svg)](https://github.com/KindaViking/cs4421-astro-blog/actions/workflows/ci.yml)
 
-A space-themed blog built with [Astro](https://astro.build): a home page, an about page and posts on rovers and space technology, with live NASA and NOAA data widgets. The project is containerised with Docker, tested at every level of a GitHub Actions pipeline, and deployed to AWS ECS Fargate with AWS CDK.
+A space-themed blog built with [Astro](https://astro.build): a home page, an about page and posts on rovers and space technology, with live NASA and NOAA data widgets. The project is containerised with Docker, tested at every level of a GitHub Actions pipeline, and deployed with AWS CDK in two versions: the full server-rendered site on ECS Fargate, and a static version on S3 and CloudFront.
 
 ## Features
 
@@ -13,8 +13,9 @@ A space-themed blog built with [Astro](https://astro.build): a home page, an abo
 - Space weather widget showing the NOAA Kp index
 - `/api/health` endpoint used by the load balancer health check
 - Multi-stage production Docker image and a separate dev container
-- CI pipeline testing every pull request at every level, with a deploy job gated on all of it
+- CI pipeline testing every pull request at every level, with both deploys gated on all of it
 - Zero-downtime rolling deploys with automatic rollback, and CloudWatch alarms
+- A static build of the same site, without the tracker and live data widgets, served over HTTPS from S3 and CloudFront
 
 ## Tech stack
 
@@ -26,16 +27,16 @@ A space-themed blog built with [Astro](https://astro.build): a home page, an abo
 | Security | npm audit, CodeQL, Trivy, Dependabot |
 | Containers | Docker (Node 22 on Alpine), Docker Compose, Amazon ECR |
 | CI/CD | GitHub Actions, Dependabot |
-| Infrastructure | AWS CDK, ECS Fargate, Application Load Balancer |
+| Infrastructure | AWS CDK, ECS Fargate, Application Load Balancer, S3, CloudFront |
 | Monitoring | CloudWatch Logs and Alarms |
 
 ## Project structure
 
 ```
 .
-├── .github/          Workflows (CI and deploy, CodeQL, stress test) and Dependabot config
+├── .github/          Workflows (CI, container and static deploys, CodeQL, stress test) and Dependabot config
 ├── .husky/           Git hooks (commit message and lint checks)
-├── cdk/              AWS CDK stack (ECS Fargate service behind a load balancer)
+├── cdk/              AWS CDK stacks (ECS Fargate service behind a load balancer; S3 and CloudFront static site)
 ├── docs/             Architecture decision records and the runbook
 ├── e2e/              Playwright end-to-end and accessibility tests
 ├── load/             k6 load and stress test script
@@ -93,7 +94,9 @@ docker compose up
 | Command | What it does |
 |---|---|
 | `npm run dev` | Start the Astro dev server on port 4321 |
-| `npm run build` | Build the site for production |
+| `npm run build` | Build the server-rendered site for production |
+| `BUILD_TARGET=static npm run build` | Build the static version of the site |
+| `npx astro preview` | Preview the last build (add `BUILD_TARGET=static` for the static build) |
 | `npm run lint` | Run ESLint |
 | `npx astro check` | Type-check the project, including `.astro` files |
 | `npm test` | Run the Vitest unit and integration tests |
@@ -107,7 +110,7 @@ Every pull request is tested at each of these levels before anything can deploy:
 |---|---|---|
 | Static analysis | ESLint, `astro check` | Code style and type errors, including in `.astro` files |
 | Unit | Vitest | Utilities, components and the satellite API route |
-| Infrastructure | Jest | The CDK stack: image tag, health check, rollback, no NAT gateways, alarms |
+| Infrastructure | Jest | The CDK stacks: image tag, health check, rollback, no NAT gateways, alarms; the static site's CloudFront setup and upload |
 | Integration | Vitest + MSW | Real requests to CelesTrak, NASA and NOAA, intercepted at the network level |
 | Container smoke | curl, jq | The production image starts, passes `/api/health`, serves pages and logs JSON |
 | End-to-end | Playwright | The satellite tracker in Chromium, Firefox and WebKit, against the container |
@@ -150,7 +153,9 @@ Workflows live in `.github/workflows`:
 
 | Workflow | Purpose |
 |---|---|
-| `ci.yml` | Runs `build`, `docker` and `infra` jobs on every pull request and push to `main`, then a `deploy` job on `main` |
+| `ci.yml` | Runs `build`, `docker` and `infra` jobs on every pull request and push to `main`, then both deploys on `main` |
+| `deploy-container.yml` | Builds the image, pushes it to ECR and deploys it to ECS. Called by `ci.yml` |
+| `deploy-static.yml` | Builds the static site and deploys it to S3 and CloudFront. Called by `ci.yml`, or run by hand |
 | `codeql.yml` | CodeQL code scanning on every pull request, every push to `main` and weekly |
 | `stress.yml` | Manually triggered k6 stress test against the live site |
 | Dependabot | Automated dependency update pull requests |
@@ -158,16 +163,18 @@ Workflows live in `.github/workflows`:
 How a change reaches production:
 
 ```
-Pull request:   build ✓   docker ✓   infra ✓   deploy (skipped)
-Merge to main:  build ✓   docker ✓   infra ✓   →   deploy
+Pull request:   build ✓   docker ✓   infra ✓   deploys (skipped)
+Merge to main:  build ✓   docker ✓   infra ✓   →   deploy-container  (ECS)
+                                                →   deploy-static     (S3 + CloudFront)
 ```
 
-- **build**: `npm ci`, `npm audit`, lint, `astro check`, unit and integration tests, then `npm run build`
+- **build**: `npm ci`, `npm audit`, lint, `astro check`, unit and integration tests, then builds both the server-rendered and static sites
 - **docker**: builds the production image, scans it with Trivy, starts it, runs the smoke test, the k6 load test and the Playwright tests against it
 - **infra**: audits the CDK dependencies, type-checks the CDK app and runs its Jest tests
-- **deploy**: waits for the other jobs and runs only on pushes to `main`. It builds the production image, tags it with the commit SHA, pushes it to ECR, then runs `cdk deploy -c imageTag=<sha>`. ECS starts the new task and waits for it to pass the `/api/health` check before stopping the old one. If the new task fails its health checks, the circuit breaker rolls back to the previous version
+- **deploy-container**: waits for the other jobs and runs only on pushes to `main`. It builds the production image, tags it with the commit SHA, pushes it to ECR, then runs `cdk deploy -c imageTag=<sha>`. ECS starts the new task and waits for it to pass the `/api/health` check before stopping the old one. If the new task fails its health checks, the circuit breaker rolls back to the previous version
+- **deploy-static**: runs alongside `deploy-container`. It builds the static site with `BUILD_TARGET=static`, then runs `cdk deploy StaticSiteStack -c staticSite=true`, which uploads it to S3 and clears the CloudFront cache
 
-The app URL is printed as the `ServiceURL` stack output at the end of the deploy step. See [ADR-002](docs/adr/ADR-002-ecs-fargate-runtime.md) for why the app runs on ECS Fargate.
+The server-rendered site's URL is the `ServiceURL` output of `AstroAppStack`, and the static site's is the `SiteURL` output of `StaticSiteStack`. Both are printed at the end of their deploy steps. See [ADR-002](docs/adr/ADR-002-ecs-fargate-runtime.md) for why the app runs on ECS Fargate, and [ADR-003](docs/adr/ADR-003-static-and-ssr-side-by-side.md) for why a static version is also deployed.
 
 Workflows use least-privilege permissions (`contents: read`). AWS credentials are stored as repository secrets, never in the code.
 
@@ -177,11 +184,13 @@ The app logs one JSON line per request (`route`, `method`, `statusCode`, `latenc
 
 Deploys are rolling updates: the old task keeps serving until the new one passes `/api/health`, and the ECS circuit breaker rolls back a deploy that never becomes healthy. This was tested with a rollback drill that deployed a broken health check.
 
+The static site has no server, so it has no health checks or alarms.
+
 See the [runbook](docs/runbook.md) for how to investigate an alarm and roll back by hand.
 
 ## Publishing the image to Amazon ECR
 
-The `deploy` job pushes an image tagged with the commit SHA on every merge to `main`. To publish a tagged release by hand:
+The `deploy-container` workflow pushes an image tagged with the commit SHA on every merge to `main`. To publish a tagged release by hand:
 
 Replace `<account_id>` with your AWS account ID:
 
@@ -205,7 +214,7 @@ aws ecr describe-images --repository-name astro-blog --region us-east-1
 - Each ticket gets its own branch, named `<issue-number>-<short-description>`.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org), e.g. `fix(a11y): raise text contrast`. A commit hook checks the format, and another runs ESLint on staged files.
 - Changes go to `main` through pull requests that close their issue, once the `build` and `docker` checks pass.
-- Merging to `main` triggers the deploy job.
+- Merging to `main` triggers both deploys.
 
 ## Releases and versioning
 
